@@ -200,10 +200,17 @@ export function resetImageManipulation(
   return img
 }
 
-export async function compressImage(img: ComposerImage): Promise<PickerImage> {
+export async function compressImage(
+  img: ComposerImage,
+  opts?: {preserveTransparency?: boolean},
+): Promise<PickerImage> {
   const source = img.transformed || img.source
 
   const [w, h] = containImageRes(source.width, source.height, POST_IMG_MAX)
+
+  // Check if we should preserve PNG format (for avatars/images with transparency)
+  const shouldPreservePNG =
+    opts?.preserveTransparency && source.mime === 'image/png'
 
   let minQualityPercentage = 0
   let maxQualityPercentage = 101 // exclusive
@@ -219,7 +226,7 @@ export async function compressImage(img: ComposerImage): Promise<PickerImage> {
       [{resize: {width: w, height: h}}],
       {
         compress: qualityPercentage / 100,
-        format: SaveFormat.JPEG,
+        format: shouldPreservePNG ? SaveFormat.PNG : SaveFormat.JPEG,
         base64: true,
       },
     )
@@ -232,7 +239,7 @@ export async function compressImage(img: ComposerImage): Promise<PickerImage> {
         path: await moveIfNecessary(res.uri),
         width: res.width,
         height: res.height,
-        mime: 'image/jpeg',
+        mime: shouldPreservePNG ? 'image/png' : 'image/jpeg',
         size,
       }
     } else {

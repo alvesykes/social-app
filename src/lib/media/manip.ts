@@ -35,11 +35,11 @@ export async function compressIfNeeded(
     height: img.height,
     mode: 'stretch',
     maxSize,
+    mimeType: img.mime,
   })
-  const finalImageMovedPath = await moveToPermanentPath(
-    resizedImage.path,
-    '.jpg',
-  )
+  // Preserve original format if it's PNG
+  const ext = img.mime === 'image/png' ? '.png' : '.jpg'
+  const finalImageMovedPath = await moveToPermanentPath(resizedImage.path, ext)
   const finalImg = {
     ...resizedImage,
     path: finalImageMovedPath,
@@ -186,6 +186,7 @@ interface DoResizeOpts {
   height: number
   mode: 'contain' | 'cover' | 'stretch'
   maxSize: number
+  mimeType?: string
 }
 
 async function doResize(
@@ -203,6 +204,11 @@ async function doResize(
     height: imageRes.height,
   })
 
+  // Determine format based on original mime type
+  const shouldPreservePNG = opts.mimeType === 'image/png'
+  const format = shouldPreservePNG ? SaveFormat.PNG : SaveFormat.JPEG
+  const mime = shouldPreservePNG ? 'image/png' : 'image/jpeg'
+
   let minQualityPercentage = 0
   let maxQualityPercentage = 101 // exclusive
   let newDataUri
@@ -216,7 +222,7 @@ async function doResize(
       localUri,
       [{resize: newDimensions}],
       {
-        format: SaveFormat.JPEG,
+        format,
         compress: qualityPercentage / 100,
       },
     )
@@ -234,7 +240,7 @@ async function doResize(
       minQualityPercentage = qualityPercentage
       newDataUri = {
         path: normalizePath(resizeRes.uri),
-        mime: 'image/jpeg',
+        mime,
         size: fileInfo.size,
         width: resizeRes.width,
         height: resizeRes.height,
