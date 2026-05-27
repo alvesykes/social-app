@@ -6,6 +6,7 @@ import {
   useInfiniteQuery,
 } from '@tanstack/react-query'
 
+import {shouldKeepModerationEntry} from '#/state/moderation-timeouts'
 import {useAgent} from '#/state/session'
 
 const RQKEY_ROOT = 'my-blocked-accounts'
@@ -49,7 +50,7 @@ export function* findAllProfilesInQueryData(
     }
     for (const page of queryData?.pages) {
       for (const block of page.blocks) {
-        if (block.did === did) {
+        if (block.did === did && shouldKeepModerationEntry('block', did)) {
           yield block
         }
       }

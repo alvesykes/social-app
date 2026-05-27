@@ -1,14 +1,20 @@
 import {useCallback, useMemo, useState} from 'react'
 import {type StyleProp, View, type ViewStyle} from 'react-native'
 import {type AppBskyActorDefs as ActorDefs} from '@atproto/api'
+import {useLingui} from '@lingui/react'
 import {Trans} from '@lingui/react/macro'
 import {type NativeStackScreenProps} from '@react-navigation/native-stack'
 
 import {type CommonNavigatorParams} from '#/lib/routes/types'
 import {cleanError} from '#/lib/strings/errors'
 import {logger} from '#/logger'
+import {
+  getModerationTimeoutRecord,
+  isExpired,
+} from '#/state/moderation-timeouts'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {useMyBlockedAccountsQuery} from '#/state/queries/my-blocked-accounts'
+import {useTickEveryMinute} from '#/state/shell'
 import {ErrorScreen} from '#/view/com/util/error/ErrorScreen'
 import {List} from '#/view/com/util/List'
 import {atoms as a, useTheme} from '#/alf'
@@ -23,7 +29,9 @@ type Props = NativeStackScreenProps<
 >
 export function ModerationBlockedAccounts({}: Props) {
   const t = useTheme()
+  const {i18n} = useLingui()
   const moderationOpts = useModerationOpts()
+  const tick = useTickEveryMinute()
 
   const [isPTRing, setIsPTRing] = useState(false)
   const {
@@ -39,10 +47,15 @@ export function ModerationBlockedAccounts({}: Props) {
   const isEmpty = !isFetching && !data?.pages[0]?.blocks.length
   const profiles = useMemo(() => {
     if (data?.pages) {
-      return data.pages.flatMap(page => page.blocks)
+      return data.pages
+        .flatMap(page => page.blocks)
+        .filter(block => {
+          const timeout = getModerationTimeoutRecord('block', block.did)
+          return !timeout || !isExpired(timeout.expiresAt)
+        })
     }
     return []
-  }, [data])
+  }, [data, tick])
 
   const onRefresh = useCallback(async () => {
     setIsPTRing(true)
@@ -72,15 +85,27 @@ export function ModerationBlockedAccounts({}: Props) {
     index: number
   }) => {
     if (!moderationOpts) return null
+    const timeout = getModerationTimeoutRecord('block', item.did)
     return (
       <View
         style={[a.py_md, a.px_xl, a.border_t, t.atoms.border_contrast_low]}
         key={item.did}>
-        <ProfileCard.Default
-          testID={`blockedAccount-${index}`}
-          profile={item}
-          moderationOpts={moderationOpts}
-        />
+        <View style={[a.gap_xs]}>
+          <ProfileCard.Default
+            testID={`blockedAccount-${index}`}
+            profile={item}
+            moderationOpts={moderationOpts}
+          />
+          {timeout?.expiresAt && !isExpired(timeout.expiresAt) ? (
+            <Text style={[a.text_sm, t.atoms.text_contrast_medium]}>
+              <Trans>Expires on</Trans>{' '}
+              {i18n.date(new Date(timeout.expiresAt), {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}
+            </Text>
+          ) : null}
+        </View>
       </View>
     )
   }

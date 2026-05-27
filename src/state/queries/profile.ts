@@ -25,6 +25,10 @@ import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {updateProfileShadow} from '#/state/cache/profile-shadow'
 import {type Shadow} from '#/state/cache/types'
 import {type ImageMeta} from '#/state/gallery'
+import {
+  clearModerationTimeout,
+  setModerationTimeout,
+} from '#/state/moderation-timeouts'
 import {STALE} from '#/state/queries'
 import {resetProfilePostsQueries} from '#/state/queries/post-feed'
 import {RQKEY as PROFILE_FOLLOWS_RQKEY} from '#/state/queries/profile-follows'
@@ -448,20 +452,36 @@ export function useProfileMuteMutationQueue(
     },
   })
 
-  const queueMute = useCallback(() => {
-    // optimistically update
-    updateProfileShadow(queryClient, did, {
-      muted: true,
-    })
-    return queueToggle(true)
-  }, [queryClient, did, queueToggle])
+  const queueMute = useCallback(
+    async ({expiresAt}: {expiresAt?: string} = {}) => {
+      // optimistically update
+      updateProfileShadow(queryClient, did, {
+        muted: true,
+      })
+      const finalMuted = await queueToggle(true)
+      if (finalMuted) {
+        await setModerationTimeout(
+          'mute',
+          did,
+          expiresAt ? {expiresAt} : undefined,
+        )
+      }
+      return finalMuted
+    },
+    [queryClient, did, queueToggle],
+  )
 
   const queueUnmute = useCallback(() => {
     // optimistically update
     updateProfileShadow(queryClient, did, {
       muted: false,
     })
-    return queueToggle(false)
+    return queueToggle(false).then(async finalMuted => {
+      if (!finalMuted) {
+        await clearModerationTimeout('mute', did)
+      }
+      return finalMuted
+    })
   }, [queryClient, did, queueToggle])
 
   return [queueMute, queueUnmute] as const
@@ -532,20 +552,36 @@ export function useProfileBlockMutationQueue(
     },
   })
 
-  const queueBlock = useCallback(() => {
-    // optimistically update
-    updateProfileShadow(queryClient, did, {
-      blockingUri: 'pending',
-    })
-    return queueToggle(true)
-  }, [queryClient, did, queueToggle])
+  const queueBlock = useCallback(
+    async ({expiresAt}: {expiresAt?: string} = {}) => {
+      // optimistically update
+      updateProfileShadow(queryClient, did, {
+        blockingUri: 'pending',
+      })
+      const finalBlockingUri = await queueToggle(true)
+      if (finalBlockingUri) {
+        await setModerationTimeout(
+          'block',
+          did,
+          expiresAt ? {expiresAt, uri: finalBlockingUri} : undefined,
+        )
+      }
+      return finalBlockingUri
+    },
+    [queryClient, did, queueToggle],
+  )
 
   const queueUnblock = useCallback(() => {
     // optimistically update
     updateProfileShadow(queryClient, did, {
       blockingUri: undefined,
     })
-    return queueToggle(false)
+    return queueToggle(false).then(async finalBlockingUri => {
+      if (!finalBlockingUri) {
+        await clearModerationTimeout('block', did)
+      }
+      return finalBlockingUri
+    })
   }, [queryClient, did, queueToggle])
 
   return [queueBlock, queueUnblock] as const
