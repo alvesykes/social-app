@@ -1,6 +1,6 @@
 import {Fragment, type ReactNode} from 'react'
 import {View} from 'react-native'
-import {type AppBskyEmbedExternal, AtUri} from '@atproto/api'
+import {AtUri} from '@atproto/api'
 import {Trans, useLingui} from '@lingui/react/macro'
 
 import {makeProfileLink} from '#/lib/routes/links'
@@ -12,19 +12,23 @@ import {
   matchStandardSitePublisher,
   matchStandardSitePublisherByUri,
 } from '#/components/Post/Embed/StandardSiteEmbed/publishers'
+import type * as ssTypes from '#/components/Post/Embed/StandardSiteEmbed/types'
 import {
   isStandardSiteDocumentUri,
   isStandardSitePublicationUri,
 } from '#/components/Post/Embed/StandardSiteEmbed/utils'
 import {Text} from '#/components/Typography'
+import {useAnalytics} from '#/analytics'
 
 export function StandardSiteMetaRow({
   type = 'document',
+  preview,
   view,
-}: {
-  type?: 'document' | 'publication'
-  view: AppBskyEmbedExternal.ViewExternal
-}) {
+}: ssTypes.CommonProps &
+  ssTypes.PreviewProps & {
+    type?: 'document' | 'publication'
+  }) {
+  const ax = useAnalytics()
   const t = useTheme()
   const {t: l} = useLingui()
   const highlightedPublisher = !!matchStandardSitePublisher(view)
@@ -43,10 +47,10 @@ export function StandardSiteMetaRow({
     : undefined
   const articleDomain = toNiceDomain(view.uri)
   const articlePublisher = matchStandardSitePublisherByUri(view.uri)
-  const DomainIcon = articlePublisher?.Icon ?? StandardSite
+  const DomainIcon = articlePublisher?.Icon || StandardSite
   const metaTextStyle = [
     a.text_xs,
-    a.leading_snug,
+    a.leading_tight,
     t.atoms.text_contrast_medium,
   ]
 
@@ -56,9 +60,11 @@ export function StandardSiteMetaRow({
     items.push({
       key: 'domain',
       node: (
-        <View style={[a.flex_row, a.align_center]}>
-          <DomainIcon size="sm" fill={t.atoms.text_contrast_medium.color} />
-          <Text numberOfLines={1} style={metaTextStyle}>
+        <View style={[a.flex_shrink, a.flex_row, a.align_center, a.gap_2xs]}>
+          {DomainIcon && (
+            <DomainIcon size="xs" fill={t.atoms.text_contrast_medium.color} />
+          )}
+          <Text numberOfLines={1} style={[metaTextStyle, a.flex_shrink]}>
             {articleDomain}
           </Text>
         </View>
@@ -70,13 +76,23 @@ export function StandardSiteMetaRow({
     items.push({
       key: 'author',
       node: (
-        <Text numberOfLines={1} style={metaTextStyle}>
+        <Text numberOfLines={1} style={[metaTextStyle]}>
           <Trans>
             by{' '}
             <InlineLinkText
               label={l`View @${authorProfile.handle}'s profile`}
               to={makeProfileLink(authorProfile)}
-              style={[metaTextStyle, a.pointer_events_auto]}>
+              style={[
+                metaTextStyle,
+                preview ? a.pointer_events_none : a.pointer_events_auto,
+              ]}
+              onPress={e => {
+                e.stopPropagation()
+                e.preventDefault()
+                ax.metric('embed:standardSite:authorHandle:press', {
+                  handle: authorProfile.handle,
+                })
+              }}>
               @{authorProfile.handle}
             </InlineLinkText>
           </Trans>

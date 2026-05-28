@@ -9,12 +9,13 @@ import {useLingui} from '@lingui/react/macro'
 
 import {createSanitizedDisplayName} from '#/lib/moderation/create-sanitized-display-name'
 import {makeProfileLink} from '#/lib/routes/links'
+import {sanitizeHandle} from '#/lib/strings/handles'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {useSession} from '#/state/session'
 import {PreviewableUserAvatar} from '#/view/com/util/UserAvatar'
 import {useIsWithinSplitView} from '#/screens/Messages/components/splitView/context'
-import {atoms as a, useTheme} from '#/alf'
+import {atoms as a, useTheme, web} from '#/alf'
 import {AvatarBubbles} from '#/components/AvatarBubbles'
 import {ButtonIcon} from '#/components/Button'
 import {ConvoMenu} from '#/components/dms/ConvoMenu'
@@ -46,7 +47,7 @@ export function MessagesListHeader({convo}: {convo?: ConvoWithDetails | null}) {
           convo.kind === 'direct' ? (
             <ProfileHeaderReady convo={convo} moderationOpts={moderationOpts} />
           ) : (
-            <GroupHeaderReady convo={convo} />
+            <GroupHeaderReady convo={convo} moderationOpts={moderationOpts} />
           )
         ) : (
           <>
@@ -85,6 +86,7 @@ function ProfileHeaderReady({
   convo: Extract<ConvoWithDetails, {kind: 'direct'}>
   moderationOpts: ModerationOpts
 }) {
+  const t = useTheme()
   const {t: l} = useLingui()
   const {currentAccount} = useSession()
   const profile = useProfileShadow(convo.primaryMember)
@@ -106,6 +108,7 @@ function ProfileHeaderReady({
   const displayName = isDeletedAccount
     ? l`Deleted Account`
     : createSanitizedDisplayName(profile, true, moderation.ui('displayName'))
+  const handle = isDeletedAccount ? null : sanitizeHandle(profile.handle, '@')
 
   const latestReportableMessage =
     ChatBskyConvoDefs.isMessageView(convo.view.lastMessage) &&
@@ -126,14 +129,23 @@ function ProfileHeaderReady({
             moderation={moderation.ui('avatar')}
             disableHoverCard={moderation.blocked}
           />
-          <View style={[a.flex_row, a.align_center, a.flex_1]}>
-            <Text
-              style={[a.text_md, a.font_semi_bold, a.flex_shrink]}
-              numberOfLines={1}>
-              {displayName}
-            </Text>
-            <ProfileBadges profile={profile} size="md" style={[a.pl_xs]} />
-            <MuteStatus muted={convo.view.muted} />
+          <View style={[a.flex_1]}>
+            <View style={[a.flex_row, a.align_center, a.flex_1, web(a.mb_2xs)]}>
+              <Text
+                style={[a.text_lg, a.font_semi_bold, a.flex_shrink]}
+                numberOfLines={1}>
+                {displayName}
+              </Text>
+              <ProfileBadges profile={profile} size="md" style={[a.pl_xs]} />
+              <MuteStatus muted={convo.view.muted} />
+            </View>
+            {handle ? (
+              <Text
+                style={[a.text_xs, t.atoms.text_contrast_high]}
+                numberOfLines={1}>
+                {handle}
+              </Text>
+            ) : null}
           </View>
         </Link>
       }
@@ -152,8 +164,10 @@ function ProfileHeaderReady({
 
 function GroupHeaderReady({
   convo,
+  moderationOpts,
 }: {
   convo: Extract<ConvoWithDetails, {kind: 'group'}>
+  moderationOpts: ModerationOpts
 }) {
   const {t: l} = useLingui()
 
@@ -176,10 +190,14 @@ function GroupHeaderReady({
                   },
                 }
           }>
-          <AvatarBubbles size={40} profiles={convo.members} />
+          <AvatarBubbles
+            size={40}
+            profiles={convo.members}
+            moderationOpts={moderationOpts}
+          />
           <View style={[a.flex_row, a.flex_1, a.align_center]}>
             <Text
-              style={[a.text_md, a.font_semi_bold, a.flex_shrink]}
+              style={[a.text_lg, a.font_semi_bold, a.flex_shrink]}
               numberOfLines={1}>
               {convo.details.name}
             </Text>
