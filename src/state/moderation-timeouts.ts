@@ -3,17 +3,16 @@ import {AtUri} from '@atproto/api'
 import {useQueryClient} from '@tanstack/react-query'
 
 import {logger} from '#/logger'
-import * as persisted from '#/state/persisted'
-import {
-  defaultsModerationTimeouts,
-  type ModerationTimeoutRecord,
-  type ModerationTimeouts,
-} from '#/state/persisted/schema'
 import {RQKEY as MY_BLOCKED_RQKEY} from '#/state/queries/my-blocked-accounts'
 import {RQKEY as MY_MUTED_RQKEY} from '#/state/queries/my-muted-accounts'
 import {RQKEY as PROFILE_RQKEY} from '#/state/queries/profile'
 import {useAgent, useSession} from '#/state/session'
 import {useTickEveryMinute} from '#/state/shell'
+import {
+  account,
+  type ModerationTimeoutRecord,
+  type ModerationTimeouts,
+} from '#/storage'
 
 export type ModerationTimeoutKind = 'block' | 'mute'
 export type ModerationTimeoutDuration =
@@ -24,16 +23,23 @@ export type ModerationTimeoutDuration =
 
 const ONE_DAY = 24 * 60 * 60 * 1000
 
-function getTimeouts(): ModerationTimeouts {
-  return persisted.get('moderationTimeouts') || defaultsModerationTimeouts
+const defaultModerationTimeouts: ModerationTimeouts = {
+  blocks: {},
+  mutes: {},
 }
 
 function getKindKey(kind: ModerationTimeoutKind) {
   return kind === 'block' ? 'blocks' : 'mutes'
 }
 
-function cloneTimeouts(): ModerationTimeouts {
-  const timeouts = getTimeouts()
+export function getModerationTimeouts(accountDid: string): ModerationTimeouts {
+  return (
+    account.get([accountDid, 'moderationTimeouts']) ?? defaultModerationTimeouts
+  )
+}
+
+function cloneModerationTimeouts(accountDid: string): ModerationTimeouts {
+  const timeouts = getModerationTimeouts(accountDid)
   return {
     blocks: {...timeouts.blocks},
     mutes: {...timeouts.mutes},
@@ -61,40 +67,46 @@ export function isExpired(expiresAt?: string) {
 }
 
 export function getModerationTimeoutRecord(
+  accountDid: string,
   kind: ModerationTimeoutKind,
   did: string,
 ) {
-  return getTimeouts()[getKindKey(kind)][did]
+  return getModerationTimeouts(accountDid)[getKindKey(kind)][did]
 }
 
 export function shouldKeepModerationEntry(
+  accountDid: string,
   kind: ModerationTimeoutKind,
   did: string,
 ) {
-  const record = getModerationTimeoutRecord(kind, did)
+  const record = getModerationTimeoutRecord(accountDid, kind, did)
   return !record || !isExpired(record.expiresAt)
 }
 
-export async function setModerationTimeout(
+export function setModerationTimeout(
+  accountDid: string,
   kind: ModerationTimeoutKind,
   did: string,
   record?: ModerationTimeoutRecord,
 ) {
-  const next = cloneTimeouts()
+  const next = cloneModerationTimeouts(accountDid)
   const kindKey = getKindKey(kind)
+
   if (record) {
     next[kindKey][did] = record
   } else {
     delete next[kindKey][did]
   }
-  await persisted.write('moderationTimeouts', next)
+
+  account.set([accountDid, 'moderationTimeouts'], next)
 }
 
 export function clearModerationTimeout(
+  accountDid: string,
   kind: ModerationTimeoutKind,
   did: string,
 ) {
-  return setModerationTimeout(kind, did, undefined)
+  setModerationTimeout(accountDid, kind, did, undefined)
 }
 
 export function useModerationTimeoutCleanup() {
@@ -108,7 +120,7 @@ export function useModerationTimeoutCleanup() {
     if (!currentAccount) return
     if (isRunning.current) return
 
-    const timeouts = getTimeouts()
+    const timeouts = getModerationTimeouts(currentAccount.did)
     const expiredBlockEntries = Object.entries(timeouts.blocks).filter(
       ([, record]) => isExpired(record.expiresAt),
     )
@@ -123,11 +135,12 @@ export function useModerationTimeoutCleanup() {
     isRunning.current = true
 
     void (async () => {
-      const nextTimeouts = cloneTimeouts()
+      const nextTimeouts = cloneModerationTimeouts(currentAccount.did)
 
       try {
         for (const [did, record] of expiredBlockEntries) {
           if (!record.uri) {
+            delete nextTimeouts.blocks[did]
             continue
           }
 
@@ -156,7 +169,8 @@ export function useModerationTimeoutCleanup() {
           }
         }
 
-        await persisted.write('moderationTimeouts', nextTimeouts)
+        account.set([currentAccount.did, 'moderationTimeouts'], nextTimeouts)
+
         void queryClient.invalidateQueries({queryKey: MY_BLOCKED_RQKEY()})
         void queryClient.invalidateQueries({queryKey: MY_MUTED_RQKEY()})
 

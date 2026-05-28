@@ -17,6 +17,7 @@ export function TimeoutSelectDialog({
   value,
   onChange,
   onConfirm,
+  confirmColor,
 }: {
   control: Dialog.DialogControlProps
   label: string
@@ -26,6 +27,7 @@ export function TimeoutSelectDialog({
   value: ModerationTimeoutDuration
   onChange: (duration: ModerationTimeoutDuration) => void
   onConfirm: (duration: ModerationTimeoutDuration) => void | Promise<void>
+  confirmColor?: 'primary' | 'negative'
 }) {
   const {t: l} = useLingui()
   const t = useTheme()
@@ -34,8 +36,8 @@ export function TimeoutSelectDialog({
     <Dialog.Outer control={control} nativeOptions={{preventExpansion: true}}>
       <Dialog.Handle />
       <Dialog.ScrollableInner label={label} style={[a.gap_2xl]}>
-        <View style={[a.gap_sm]}>
-          <Text style={[a.text_2xl, a.font_semi_bold]}>{title}</Text>
+        <View style={[a.gap_sm, a.pb_sm]}>
+          <Text style={[a.text_2xl, a.font_bold]}>{title}</Text>
           <Text
             style={[a.text_md, a.leading_snug, t.atoms.text_contrast_medium]}>
             {description}
@@ -49,7 +51,7 @@ export function TimeoutSelectDialog({
           onChange={values =>
             onChange((values.at(0) || 'forever') as ModerationTimeoutDuration)
           }>
-          <View style={[a.gap_sm]}>
+          <View style={[a.gap_2xs]}>
             <Option
               label={l`Forever`}
               name="forever"
@@ -109,12 +111,12 @@ export function TimeoutSelectDialog({
           </View>
         </Toggle.Group>
 
-        <View style={[a.gap_sm]}>
+        <View style={[a.gap_sm, a.mt_md]}>
           <Button
             label={confirmLabel}
             onPress={() => control.close(() => void onConfirm(value))}
             size="large"
-            color="primary">
+            color={confirmColor ?? 'primary'}>
             <ButtonText>{confirmLabel}</ButtonText>
           </Button>
           <Button
@@ -146,27 +148,19 @@ function Option({
   const t = useTheme()
   return (
     <Toggle.Item label={label} name={name}>
-      <View
-        style={[
-          a.flex_row,
-          a.align_center,
-          a.justify_between,
-          a.gap_md,
-          a.py_md,
-          a.px_md,
-          a.rounded_sm,
-          t.atoms.bg_contrast_25,
-        ]}>
-        <View style={[a.flex_1, a.gap_2xs]}>
-          <Toggle.LabelText style={[a.text_md, a.font_semi_bold]}>
-            {title}
-          </Toggle.LabelText>
-          <Text style={[a.text_sm, t.atoms.text_contrast_medium]}>
-            {subtitle}
-          </Text>
-        </View>
-        <Toggle.Radio />
-      </View>
+      {({selected}) => (
+        <Toggle.Panel active={selected}>
+          <Toggle.Radio />
+          <View style={[a.flex_1, a.gap_2xs]}>
+            <Toggle.LabelText style={[a.text_md, a.font_semi_bold]}>
+              {title}
+            </Toggle.LabelText>
+            <Text style={[a.text_sm, t.atoms.text_contrast_medium]}>
+              {subtitle}
+            </Text>
+          </View>
+        </Toggle.Panel>
+      )}
     </Toggle.Item>
   )
 }

@@ -7,26 +7,6 @@ import {PlatformInfo} from '../../../modules/expo-bluesky-swiss-army'
 
 const externalEmbedOptions = ['show', 'hide'] as const
 
-const moderationTimeoutRecordSchema = z.object({
-  expiresAt: z.string(),
-  uri: z.string().optional(),
-})
-
-const moderationTimeoutsSchema = z.object({
-  blocks: z.record(moderationTimeoutRecordSchema),
-  mutes: z.record(moderationTimeoutRecordSchema.omit({uri: true})),
-})
-
-export type ModerationTimeoutRecord = z.infer<
-  typeof moderationTimeoutRecordSchema
->
-export type ModerationTimeouts = z.infer<typeof moderationTimeoutsSchema>
-
-export const defaultsModerationTimeouts: ModerationTimeouts = {
-  blocks: {},
-  mutes: {},
-}
-
 /**
  * A account persisted to storage. Stored in the `accounts[]` array. Contains
  * base account info and access tokens.
@@ -148,9 +128,6 @@ const schema = z.object({
   subtitlesEnabled: z.boolean().optional(),
   /** @deprecated */
   mutedThreads: z.array(z.string()),
-  moderationTimeouts: moderationTimeoutsSchema.default(
-    defaultsModerationTimeouts,
-  ),
   trendingDisabled: z.boolean().optional(),
   trendingVideoDisabled: z.boolean().optional(),
 })
@@ -198,7 +175,6 @@ export const defaults: Schema = {
   kawaii: false,
   hasCheckedForStarterPack: false,
   subtitlesEnabled: true,
-  moderationTimeouts: defaultsModerationTimeouts,
   trendingDisabled: false,
   trendingVideoDisabled: false,
 }

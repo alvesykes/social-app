@@ -424,6 +424,7 @@ export function useProfileMuteMutationQueue(
 ) {
   const ax = useAnalytics()
   const queryClient = useQueryClient()
+  const {currentAccount} = useSession()
   const did = profile.did
   const initialMuted = profile.viewer?.muted
   const muteMutation = useProfileMuteMutation()
@@ -460,15 +461,18 @@ export function useProfileMuteMutationQueue(
       })
       const finalMuted = await queueToggle(true)
       if (finalMuted) {
-        await setModerationTimeout(
-          'mute',
-          did,
-          expiresAt ? {expiresAt} : undefined,
-        )
+        if (currentAccount) {
+          setModerationTimeout(
+            currentAccount.did,
+            'mute',
+            did,
+            expiresAt ? {expiresAt} : undefined,
+          )
+        }
       }
       return finalMuted
     },
-    [queryClient, did, queueToggle],
+    [currentAccount, queryClient, did, queueToggle],
   )
 
   const queueUnmute = useCallback(() => {
@@ -478,11 +482,13 @@ export function useProfileMuteMutationQueue(
     })
     return queueToggle(false).then(async finalMuted => {
       if (!finalMuted) {
-        await clearModerationTimeout('mute', did)
+        if (currentAccount) {
+          clearModerationTimeout(currentAccount.did, 'mute', did)
+        }
       }
       return finalMuted
     })
-  }, [queryClient, did, queueToggle])
+  }, [currentAccount, queryClient, did, queueToggle])
 
   return [queueMute, queueUnmute] as const
 }
@@ -518,6 +524,7 @@ export function useProfileBlockMutationQueue(
 ) {
   const ax = useAnalytics()
   const queryClient = useQueryClient()
+  const {currentAccount} = useSession()
   const did = profile.did
   const initialBlockingUri = profile.viewer?.blocking
   const blockMutation = useProfileBlockMutation()
@@ -560,15 +567,18 @@ export function useProfileBlockMutationQueue(
       })
       const finalBlockingUri = await queueToggle(true)
       if (finalBlockingUri) {
-        await setModerationTimeout(
-          'block',
-          did,
-          expiresAt ? {expiresAt, uri: finalBlockingUri} : undefined,
-        )
+        if (currentAccount) {
+          setModerationTimeout(
+            currentAccount.did,
+            'block',
+            did,
+            expiresAt ? {expiresAt, uri: finalBlockingUri} : undefined,
+          )
+        }
       }
       return finalBlockingUri
     },
-    [queryClient, did, queueToggle],
+    [currentAccount, queryClient, did, queueToggle],
   )
 
   const queueUnblock = useCallback(() => {
@@ -578,11 +588,13 @@ export function useProfileBlockMutationQueue(
     })
     return queueToggle(false).then(async finalBlockingUri => {
       if (!finalBlockingUri) {
-        await clearModerationTimeout('block', did)
+        if (currentAccount) {
+          clearModerationTimeout(currentAccount.did, 'block', did)
+        }
       }
       return finalBlockingUri
     })
-  }, [queryClient, did, queueToggle])
+  }, [currentAccount, queryClient, did, queueToggle])
 
   return [queueBlock, queueUnblock] as const
 }

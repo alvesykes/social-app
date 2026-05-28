@@ -6,7 +6,6 @@ import {
   useInfiniteQuery,
 } from '@tanstack/react-query'
 
-import {shouldKeepModerationEntry} from '#/state/moderation-timeouts'
 import {useAgent} from '#/state/session'
 
 const RQKEY_ROOT = 'my-muted-accounts'
@@ -50,7 +49,7 @@ export function* findAllProfilesInQueryData(
     }
     for (const page of queryData?.pages) {
       for (const mute of page.mutes) {
-        if (mute.did === did && shouldKeepModerationEntry('mute', did)) {
+        if (mute.did === did) {
           yield mute
         }
       }

@@ -14,6 +14,7 @@ import {
 } from '#/state/moderation-timeouts'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {useMyBlockedAccountsQuery} from '#/state/queries/my-blocked-accounts'
+import {useSession} from '#/state/session'
 import {useTickEveryMinute} from '#/state/shell'
 import {ErrorScreen} from '#/view/com/util/error/ErrorScreen'
 import {List} from '#/view/com/util/List'
@@ -31,6 +32,7 @@ export function ModerationBlockedAccounts({}: Props) {
   const t = useTheme()
   const {i18n} = useLingui()
   const moderationOpts = useModerationOpts()
+  const {currentAccount} = useSession()
   const tick = useTickEveryMinute()
 
   const [isPTRing, setIsPTRing] = useState(false)
@@ -44,18 +46,24 @@ export function ModerationBlockedAccounts({}: Props) {
     fetchNextPage,
     isFetchingNextPage,
   } = useMyBlockedAccountsQuery()
-  const isEmpty = !isFetching && !data?.pages[0]?.blocks.length
   const profiles = useMemo(() => {
-    if (data?.pages) {
-      return data.pages
-        .flatMap(page => page.blocks)
-        .filter(block => {
-          const timeout = getModerationTimeoutRecord('block', block.did)
-          return !timeout || !isExpired(timeout.expiresAt)
-        })
+    if (!currentAccount || !data?.pages) {
+      return []
     }
-    return []
-  }, [data, tick])
+
+    return data.pages
+      .flatMap(page => page.blocks)
+      .filter(block => {
+        const timeout = getModerationTimeoutRecord(
+          currentAccount.did,
+          'block',
+          block.did,
+        )
+        return !timeout || !isExpired(timeout.expiresAt)
+      })
+  }, [currentAccount, data, tick])
+
+  const isEmpty = !isFetching && profiles.length === 0
 
   const onRefresh = useCallback(async () => {
     setIsPTRing(true)
@@ -85,7 +93,9 @@ export function ModerationBlockedAccounts({}: Props) {
     index: number
   }) => {
     if (!moderationOpts) return null
-    const timeout = getModerationTimeoutRecord('block', item.did)
+    const timeout = currentAccount
+      ? getModerationTimeoutRecord(currentAccount.did, 'block', item.did)
+      : undefined
     return (
       <View
         style={[a.py_md, a.px_xl, a.border_t, t.atoms.border_contrast_low]}

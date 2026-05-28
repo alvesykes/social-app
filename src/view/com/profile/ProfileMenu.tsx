@@ -571,7 +571,7 @@ let ProfileMenu = ({
         description={_(
           msg`Choose whether this mute should be temporary or stay in place until you remove it.`,
         )}
-        confirmLabel={_(msg`Mute account`)}
+        confirmLabel={_(msg`Mute`)}
         value={muteDuration}
         onChange={setMuteDuration}
         onConfirm={onConfirmMuteTimeout}
@@ -582,9 +582,10 @@ let ProfileMenu = ({
         label={_(msg`Choose how long to block this account`)}
         title={_(msg`Block account`)}
         description={_(
-          msg`Choose whether this block should be temporary or stay in place until you remove it.`,
+          msg`Blocked accounts cannot reply in your threads, mention you, or otherwise interact with you. Choose whether this block should be temporary or permanent.`,
         )}
-        confirmLabel={_(msg`Block account`)}
+        confirmLabel={_(msg`Block`)}
+        confirmColor="negative"
         value={blockDuration}
         onChange={setBlockDuration}
         onConfirm={onConfirmBlockTimeout}
